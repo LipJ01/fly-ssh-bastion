@@ -1,0 +1,526 @@
+# Change these to your own Fly.io app name and region
+app = "fly-ssh-bastion"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[mounts]
+  source = "bastion_data"
+  destination = "/data"
+
+# API (HTTPS)
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 50
+    soft_limit = 25
+
+# sshpiper routing (port 22)
+[[services]]
+  internal_port = 2223
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 22
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 50
+
+# sshd for reverse tunnel connections (port 2222)
+[[services]]
+  internal_port = 2222
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 2222
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 10
+
+# Reverse tunnel ports (10022-10099)
+# Each registered machine gets assigned one port from this range.
+
+[[services]]
+  internal_port = 10022
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10022
+
+[[services]]
+  internal_port = 10023
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10023
+
+[[services]]
+  internal_port = 10024
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10024
+
+[[services]]
+  internal_port = 10025
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10025
+
+[[services]]
+  internal_port = 10026
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10026
+
+[[services]]
+  internal_port = 10027
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10027
+
+[[services]]
+  internal_port = 10028
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10028
+
+[[services]]
+  internal_port = 10029
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10029
+
+[[services]]
+  internal_port = 10030
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10030
+
+[[services]]
+  internal_port = 10031
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10031
+
+[[services]]
+  internal_port = 10032
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10032
+
+[[services]]
+  internal_port = 10033
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10033
+
+[[services]]
+  internal_port = 10034
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10034
+
+[[services]]
+  internal_port = 10035
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10035
+
+[[services]]
+  internal_port = 10036
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10036
+
+[[services]]
+  internal_port = 10037
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10037
+
+[[services]]
+  internal_port = 10038
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10038
+
+[[services]]
+  internal_port = 10039
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10039
+
+[[services]]
+  internal_port = 10040
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10040
+
+[[services]]
+  internal_port = 10041
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10041
+
+[[services]]
+  internal_port = 10042
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10042
+
+[[services]]
+  internal_port = 10043
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10043
+
+[[services]]
+  internal_port = 10044
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10044
+
+[[services]]
+  internal_port = 10045
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10045
+
+[[services]]
+  internal_port = 10046
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10046
+
+[[services]]
+  internal_port = 10047
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10047
+
+[[services]]
+  internal_port = 10048
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10048
+
+[[services]]
+  internal_port = 10049
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10049
+
+[[services]]
+  internal_port = 10050
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10050
+
+[[services]]
+  internal_port = 10051
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10051
+
+[[services]]
+  internal_port = 10052
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10052
+
+[[services]]
+  internal_port = 10053
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10053
+
+[[services]]
+  internal_port = 10054
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10054
+
+[[services]]
+  internal_port = 10055
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10055
+
+[[services]]
+  internal_port = 10056
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10056
+
+[[services]]
+  internal_port = 10057
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10057
+
+[[services]]
+  internal_port = 10058
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10058
+
+[[services]]
+  internal_port = 10059
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10059
+
+[[services]]
+  internal_port = 10060
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10060
+
+[[services]]
+  internal_port = 10061
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10061
+
+[[services]]
+  internal_port = 10062
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10062
+
+[[services]]
+  internal_port = 10063
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10063
+
+[[services]]
+  internal_port = 10064
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10064
+
+[[services]]
+  internal_port = 10065
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10065
+
+[[services]]
+  internal_port = 10066
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10066
+
+[[services]]
+  internal_port = 10067
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10067
+
+[[services]]
+  internal_port = 10068
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10068
+
+[[services]]
+  internal_port = 10069
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10069
+
+[[services]]
+  internal_port = 10070
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10070
+
+[[services]]
+  internal_port = 10071
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10071
+
+[[services]]
+  internal_port = 10072
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10072
+
+[[services]]
+  internal_port = 10073
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10073
+
+[[services]]
+  internal_port = 10074
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10074
+
+[[services]]
+  internal_port = 10075
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10075
+
+[[services]]
+  internal_port = 10076
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10076
+
+[[services]]
+  internal_port = 10077
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10077
+
+[[services]]
+  internal_port = 10078
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10078
+
+[[services]]
+  internal_port = 10079
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10079
+
+[[services]]
+  internal_port = 10080
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10080
+
+[[services]]
+  internal_port = 10081
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10081
+
+[[services]]
+  internal_port = 10082
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10082
+
+[[services]]
+  internal_port = 10083
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10083
+
+[[services]]
+  internal_port = 10084
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10084
+
+[[services]]
+  internal_port = 10085
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10085
+
+[[services]]
+  internal_port = 10086
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10086
+
+[[services]]
+  internal_port = 10087
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10087
+
+[[services]]
+  internal_port = 10088
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10088
+
+[[services]]
+  internal_port = 10089
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10089
+
+[[services]]
+  internal_port = 10090
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10090
+
+[[services]]
+  internal_port = 10091
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10091
+
+[[services]]
+  internal_port = 10092
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10092
+
+[[services]]
+  internal_port = 10093
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10093
+
+[[services]]
+  internal_port = 10094
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10094
+
+[[services]]
+  internal_port = 10095
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10095
+
+[[services]]
+  internal_port = 10096
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10096
+
+[[services]]
+  internal_port = 10097
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10097
+
+[[services]]
+  internal_port = 10098
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10098
+
+[[services]]
+  internal_port = 10099
+  protocol = "tcp"
+  [[services.ports]]
+    port = 10099
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

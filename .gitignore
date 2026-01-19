@@ -1,0 +1,23 @@
+.DS_Store
+*.log
+
+# Go
+/bastion
+/bastiond
+/dist/
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+
+# SSH keys (never commit private keys)
+fly-bastion
+fly-bastion.pub
+ssh_host_keys/
+*_key
+!*_key.pub
+
+# OS
+.DS_Store
+Thumbs.db
