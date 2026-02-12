@@ -37,6 +37,7 @@ func NewRouter(database *db.DB, gen *config.Generator, apiSecret, serverURL stri
 		r.Post("/api/register", h.Register)
 		r.Get("/api/machines", h.ListMachines)
 		r.Delete("/api/machines/{name}", h.DeleteMachine)
+		r.Put("/api/machines/{name}/rename", h.RenameMachine)
 		r.Post("/api/heartbeat", h.Heartbeat)
 	})
 

@@ -118,6 +118,11 @@ ssh machinename@your-bastion-host
 | `bastion uninstall` | Remove launchd service |
 | `bastion status` | Show tunnel config, service status, and server health |
 | `bastion list` | List all registered machines |
+| `bastion delete [name]` | Delete a machine (defaults to this machine); cleans up launchd if deleting self |
+| `bastion rename <new-name>` | Rename this machine on the server and update local config |
+| `bastion config list` | List all config values (API key is masked) |
+| `bastion config get <key>` | Get a single config value |
+| `bastion config set <key> <value>` | Set a config value (server_url, api_key, machine_name, key_path) |
 
 ### Register flags
 
@@ -220,6 +225,7 @@ Reverse tunnel ports 10022–10099 are allocated one per machine (up to 78 machi
 | `POST` | `/api/register` | Register a new machine |
 | `GET` | `/api/machines` | List all registered machines |
 | `DELETE` | `/api/machines/{name}` | Delete a machine |
+| `PUT` | `/api/machines/{name}/rename` | Rename a machine |
 | `POST` | `/api/heartbeat` | Update machine heartbeat |
 
 ### Environment variables

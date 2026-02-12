@@ -178,6 +178,50 @@ func TestUpdateLastSeenNotFound(t *testing.T) {
 	}
 }
 
+func TestRenameMachine(t *testing.T) {
+	db := tempDB(t)
+
+	db.CreateMachine(&Machine{Name: "old-name", Owner: "a", LocalUser: "a", PublicKey: "k"})
+
+	if err := db.RenameMachine("old-name", "new-name"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	// Old name should be gone
+	got, _ := db.GetMachine("old-name")
+	if got != nil {
+		t.Fatal("expected old name to be gone")
+	}
+
+	// New name should exist
+	got, _ = db.GetMachine("new-name")
+	if got == nil {
+		t.Fatal("expected new name to exist")
+	}
+	if got.Owner != "a" {
+		t.Fatalf("expected owner to be preserved, got %s", got.Owner)
+	}
+}
+
+func TestRenameMachineNotFound(t *testing.T) {
+	db := tempDB(t)
+
+	if err := db.RenameMachine("ghost", "new-name"); err == nil {
+		t.Fatal("expected error renaming nonexistent machine")
+	}
+}
+
+func TestRenameMachineDuplicate(t *testing.T) {
+	db := tempDB(t)
+
+	db.CreateMachine(&Machine{Name: "m1", Owner: "a", LocalUser: "a", PublicKey: "k1"})
+	db.CreateMachine(&Machine{Name: "m2", Owner: "b", LocalUser: "b", PublicKey: "k2"})
+
+	if err := db.RenameMachine("m1", "m2"); err == nil {
+		t.Fatal("expected error renaming to duplicate name")
+	}
+}
+
 func TestPortExhaustion(t *testing.T) {
 	db := tempDB(t)
 

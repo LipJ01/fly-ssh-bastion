@@ -102,6 +102,9 @@ func main() {
 	root.AddCommand(uninstallCmd())
 	root.AddCommand(statusCmd())
 	root.AddCommand(listCmd())
+	root.AddCommand(deleteCmd())
+	root.AddCommand(renameCmd())
+	root.AddCommand(configCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -560,6 +563,212 @@ func listCmd() *cobra.Command {
 			}
 			return nil
 		},
+	}
+}
+
+func deleteCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete [name]",
+		Short: "Delete a machine from the server (defaults to this machine)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+
+			name := cfg.MachineName
+			if len(args) > 0 {
+				name = args[0]
+			}
+
+			resp, err := apiRequest(cfg, "DELETE", "/api/machines/"+name, nil)
+			if err != nil {
+				return fmt.Errorf("request failed: %w", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				return fmt.Errorf("delete failed (%d): %s", resp.StatusCode, string(body))
+			}
+
+			fmt.Printf("Deleted machine %q\n", name)
+
+			// If deleting self, clean up local state
+			if name == cfg.MachineName {
+				if runtime.GOOS == "darwin" {
+					home, _ := os.UserHomeDir()
+					plistPath := filepath.Join(home, "Library", "LaunchAgents", "com.bastion.tunnel.plist")
+					exec.Command("launchctl", "unload", plistPath).Run()
+					os.Remove(plistPath)
+					fmt.Println("Uninstalled launchd service.")
+				}
+				cfg.AssignedPort = 0
+				if err := saveConfig(cfg); err != nil {
+					return fmt.Errorf("failed to update config: %w", err)
+				}
+				fmt.Println("Cleared assigned port from local config.")
+			}
+
+			return nil
+		},
+	}
+}
+
+func renameCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "rename <new-name>",
+		Short: "Rename this machine on the server",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+
+			newName := args[0]
+			body := map[string]string{"new_name": newName}
+
+			resp, err := apiRequest(cfg, "PUT", "/api/machines/"+cfg.MachineName+"/rename", body)
+			if err != nil {
+				return fmt.Errorf("request failed: %w", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				respBody, _ := io.ReadAll(resp.Body)
+				return fmt.Errorf("rename failed (%d): %s", resp.StatusCode, string(respBody))
+			}
+
+			oldName := cfg.MachineName
+			cfg.MachineName = newName
+			if err := saveConfig(cfg); err != nil {
+				return fmt.Errorf("failed to update config: %w", err)
+			}
+
+			fmt.Printf("Renamed %q -> %q\n", oldName, newName)
+			return nil
+		},
+	}
+}
+
+func configCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "View or update client configuration",
+	}
+
+	validKeys := map[string]bool{
+		"server_url":   true,
+		"api_key":      true,
+		"machine_name": true,
+		"key_path":     true,
+	}
+	readOnlyKeys := map[string]bool{
+		"assigned_port": true,
+	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "get <key>",
+		Short: "Get a config value",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key := args[0]
+			if !validKeys[key] && !readOnlyKeys[key] {
+				return fmt.Errorf("unknown key %q (valid: server_url, api_key, machine_name, key_path, assigned_port)", key)
+			}
+
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+
+			val := getConfigValue(cfg, key)
+			if key == "api_key" {
+				val = maskStr(val)
+			}
+			fmt.Println(val)
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set <key> <value>",
+		Short: "Set a config value",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key, value := args[0], args[1]
+			if !validKeys[key] {
+				if readOnlyKeys[key] {
+					return fmt.Errorf("%q is read-only (set by server during register)", key)
+				}
+				return fmt.Errorf("unknown key %q (valid: server_url, api_key, machine_name, key_path)", key)
+			}
+
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+
+			setConfigValue(cfg, key, value)
+			if err := saveConfig(cfg); err != nil {
+				return err
+			}
+			fmt.Printf("Set %s = %s\n", key, value)
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List all config values",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("%-15s %s\n", "server_url", cfg.ServerURL)
+			fmt.Printf("%-15s %s\n", "api_key", maskStr(cfg.APIKey))
+			fmt.Printf("%-15s %s\n", "machine_name", cfg.MachineName)
+			fmt.Printf("%-15s %s\n", "key_path", cfg.KeyPath)
+			fmt.Printf("%-15s %d\n", "assigned_port", cfg.AssignedPort)
+			return nil
+		},
+	})
+
+	return cmd
+}
+
+func getConfigValue(cfg *clientConfig, key string) string {
+	switch key {
+	case "server_url":
+		return cfg.ServerURL
+	case "api_key":
+		return cfg.APIKey
+	case "machine_name":
+		return cfg.MachineName
+	case "key_path":
+		return cfg.KeyPath
+	case "assigned_port":
+		return fmt.Sprintf("%d", cfg.AssignedPort)
+	default:
+		return ""
+	}
+}
+
+func setConfigValue(cfg *clientConfig, key, value string) {
+	switch key {
+	case "server_url":
+		cfg.ServerURL = value
+	case "api_key":
+		cfg.APIKey = value
+	case "machine_name":
+		cfg.MachineName = value
+	case "key_path":
+		cfg.KeyPath = value
 	}
 }
 

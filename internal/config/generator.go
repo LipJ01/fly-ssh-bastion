@@ -50,6 +50,13 @@ func (g *Generator) WriteKey(name, publicKey string) error {
 	return os.WriteFile(path, []byte(publicKey+"\n"), 0644)
 }
 
+// RenameKey renames a machine's public key file.
+func (g *Generator) RenameKey(oldName, newName string) error {
+	oldPath := filepath.Join(g.KeysDir, oldName+".pub")
+	newPath := filepath.Join(g.KeysDir, newName+".pub")
+	return os.Rename(oldPath, newPath)
+}
+
 // RemoveKey removes a machine's public key file.
 func (g *Generator) RemoveKey(name string) error {
 	path := filepath.Join(g.KeysDir, name+".pub")

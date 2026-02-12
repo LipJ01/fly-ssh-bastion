@@ -109,6 +109,39 @@ func TestWriteAndRemoveKey(t *testing.T) {
 	}
 }
 
+func TestRenameKey(t *testing.T) {
+	dir := t.TempDir()
+	keysDir := filepath.Join(dir, "keys")
+	os.MkdirAll(keysDir, 0755)
+	gen := NewGenerator("", keysDir, "")
+
+	// Write a key first
+	if err := gen.WriteKey("old-machine", "ssh-ed25519 AAAA test"); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+
+	// Rename it
+	if err := gen.RenameKey("old-machine", "new-machine"); err != nil {
+		t.Fatalf("rename key: %v", err)
+	}
+
+	// Old path should be gone
+	oldPath := filepath.Join(keysDir, "old-machine.pub")
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Fatal("old key file should be gone")
+	}
+
+	// New path should exist with same content
+	newPath := filepath.Join(keysDir, "new-machine.pub")
+	data, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("read new key: %v", err)
+	}
+	if !strings.Contains(string(data), "ssh-ed25519 AAAA test") {
+		t.Fatalf("unexpected key content: %s", string(data))
+	}
+}
+
 func TestUpdateAuthorizedKeys(t *testing.T) {
 	dir := t.TempDir()
 

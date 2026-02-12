@@ -193,6 +193,54 @@ func (h *Handlers) DeleteMachine(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"ok":true}`))
 }
 
+func (h *Handlers) RenameMachine(w http.ResponseWriter, r *http.Request) {
+	oldName := chi.URLParam(r, "name")
+
+	var req struct {
+		NewName string `json:"new_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if req.NewName == "" {
+		jsonError(w, "new_name is required", http.StatusBadRequest)
+		return
+	}
+	if !validName.MatchString(req.NewName) {
+		jsonError(w, "invalid new name: must be alphanumeric with optional dots, hyphens, underscores (max 64 chars)", http.StatusBadRequest)
+		return
+	}
+
+	// Check if new name already taken
+	existing, err := h.DB.GetMachine(req.NewName)
+	if err != nil {
+		log.Printf("error checking machine: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		jsonError(w, fmt.Sprintf("machine %q already exists", req.NewName), http.StatusConflict)
+		return
+	}
+
+	if err := h.DB.RenameMachine(oldName, req.NewName); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if err := h.Gen.RenameKey(oldName, req.NewName); err != nil {
+		log.Printf("warning: failed to rename key file: %v", err)
+	}
+
+	if err := h.regenerateConfig(); err != nil {
+		log.Printf("error regenerating config: %v", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"name": req.NewName})
+}
+
 func (h *Handlers) Status(w http.ResponseWriter, r *http.Request) {
 	machines, err := h.DB.ListMachines()
 	if err != nil {

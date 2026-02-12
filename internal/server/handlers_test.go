@@ -262,6 +262,98 @@ func TestDeleteNotFound(t *testing.T) {
 	}
 }
 
+func TestRenameMachine(t *testing.T) {
+	srv, database := setupTestServer(t)
+
+	// Register a machine
+	body := map[string]string{
+		"name": "old-name", "owner": "test", "local_user": "test", "public_key": "ssh-ed25519 AAAA test",
+	}
+	resp := authRequest(t, "POST", srv.URL+"/api/register", body)
+	resp.Body.Close()
+
+	// Rename it
+	renameBody := map[string]string{"new_name": "new-name"}
+	resp = authRequest(t, "PUT", srv.URL+"/api/machines/old-name/rename", renameBody)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errBody map[string]string
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		t.Fatalf("expected 200, got %d: %v", resp.StatusCode, errBody)
+	}
+
+	var result map[string]string
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result["name"] != "new-name" {
+		t.Fatalf("expected name new-name, got %v", result["name"])
+	}
+
+	// Verify in DB
+	m, _ := database.GetMachine("new-name")
+	if m == nil {
+		t.Fatal("expected machine with new name in DB")
+	}
+	old, _ := database.GetMachine("old-name")
+	if old != nil {
+		t.Fatal("old name should be gone from DB")
+	}
+}
+
+func TestRenameNotFound(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	body := map[string]string{"new_name": "new-name"}
+	resp := authRequest(t, "PUT", srv.URL+"/api/machines/ghost/rename", body)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestRenameDuplicate(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	// Register two machines
+	for _, name := range []string{"m1", "m2"} {
+		body := map[string]string{
+			"name": name, "owner": "test", "local_user": "test", "public_key": "ssh-ed25519 AAAA " + name,
+		}
+		resp := authRequest(t, "POST", srv.URL+"/api/register", body)
+		resp.Body.Close()
+	}
+
+	// Try to rename m1 to m2
+	body := map[string]string{"new_name": "m2"}
+	resp := authRequest(t, "PUT", srv.URL+"/api/machines/m1/rename", body)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", resp.StatusCode)
+	}
+}
+
+func TestRenameInvalidName(t *testing.T) {
+	srv, _ := setupTestServer(t)
+
+	// Register a machine
+	regBody := map[string]string{
+		"name": "valid", "owner": "test", "local_user": "test", "public_key": "ssh-ed25519 AAAA test",
+	}
+	resp := authRequest(t, "POST", srv.URL+"/api/register", regBody)
+	resp.Body.Close()
+
+	// Try to rename to an invalid name
+	body := map[string]string{"new_name": "invalid name with spaces!"}
+	resp = authRequest(t, "PUT", srv.URL+"/api/machines/valid/rename", body)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
 func TestHeartbeat(t *testing.T) {
 	srv, database := setupTestServer(t)
 

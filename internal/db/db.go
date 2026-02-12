@@ -130,6 +130,18 @@ func (db *DB) DeleteMachine(name string) error {
 	return nil
 }
 
+func (db *DB) RenameMachine(oldName, newName string) error {
+	result, err := db.conn.Exec("UPDATE machines SET name = ? WHERE name = ?", newName, oldName)
+	if err != nil {
+		return fmt.Errorf("rename machine: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("machine %q not found", oldName)
+	}
+	return nil
+}
+
 func (db *DB) UpdateLastSeen(name string) error {
 	result, err := db.conn.Exec("UPDATE machines SET last_seen = CURRENT_TIMESTAMP WHERE name = ?", name)
 	if err != nil {
