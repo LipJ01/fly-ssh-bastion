@@ -135,6 +135,7 @@ func initCmd() *cobra.Command {
 			}
 
 			fmt.Printf("API Key [%s]: ", maskStr(cfg.APIKey))
+			input = ""
 			fmt.Scanln(&input)
 			if input != "" {
 				cfg.APIKey = input
@@ -142,6 +143,7 @@ func initCmd() *cobra.Command {
 
 			hostname, _ := os.Hostname()
 			fmt.Printf("Machine name [%s]: ", defaultStr(cfg.MachineName, hostname))
+			input = ""
 			fmt.Scanln(&input)
 			if input != "" {
 				cfg.MachineName = input
@@ -153,6 +155,7 @@ func initCmd() *cobra.Command {
 			home, _ := os.UserHomeDir()
 			defaultKeyPath := filepath.Join(home, ".ssh", "bastion-key")
 			fmt.Printf("SSH key path [%s]: ", defaultStr(cfg.KeyPath, defaultKeyPath))
+			input = ""
 			fmt.Scanln(&input)
 			if input != "" {
 				cfg.KeyPath = input
