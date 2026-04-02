@@ -11,17 +11,17 @@ import (
 
 const sshpiperTemplate = `version: "1.0"
 pipes:
-{{- range .Entries }}
+{{- range $entry := .Entries }}
   - from:
-      - username: "{{ .Machine.Name }}"
+      - username: "{{ $entry.Machine.Name }}"
         authorized_keys:
-          - {{ $.KeysDir }}/{{ .Machine.Name }}.pub
-{{- range .AccessKeys }}
-          - {{ $.KeysDir }}/{{ .Machine.Name }}_ak_{{ .ID }}.pub
+          - {{ $.KeysDir }}/{{ $entry.Machine.Name }}.pub
+{{- range $entry.AccessKeys }}
+          - {{ $.KeysDir }}/{{ $entry.Machine.Name }}_ak_{{ .ID }}.pub
 {{- end }}
     to:
-      host: localhost:{{ .Machine.Port }}
-      username: "{{ .Machine.LocalUser }}"
+      host: localhost:{{ $entry.Machine.Port }}
+      username: "{{ $entry.Machine.LocalUser }}"
       private_key: {{ $.ServerKey }}
       ignore_hostkey: true
 {{- end }}
