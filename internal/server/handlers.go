@@ -313,12 +313,12 @@ func (h *Handlers) AddAccessKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.rewriteMachineKeys(machine); err != nil {
-		log.Printf("error rewriting machine keys: %v", err)
+	if err := h.Gen.WriteAccessKey(machineName, key.ID, req.PublicKey); err != nil {
+		log.Printf("error writing access key file: %v", err)
 	}
 
-	if h.OnChange != nil {
-		h.OnChange()
+	if err := h.regenerateConfig(); err != nil {
+		log.Printf("error regenerating config: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -380,33 +380,14 @@ func (h *Handlers) DeleteAccessKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	machine, _ := h.DB.GetMachine(machineName)
-	if machine != nil {
-		if err := h.rewriteMachineKeys(machine); err != nil {
-			log.Printf("error rewriting machine keys: %v", err)
-		}
-	}
+	_ = h.Gen.RemoveAccessKey(machineName, keyID)
 
-	if h.OnChange != nil {
-		h.OnChange()
+	if err := h.regenerateConfig(); err != nil {
+		log.Printf("error regenerating config: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
-}
-
-// rewriteMachineKeys rewrites a machine's .pub file with its registration key
-// plus all access keys, so sshpiper accepts any of them.
-func (h *Handlers) rewriteMachineKeys(machine *db.Machine) error {
-	accessKeys, err := h.DB.ListAccessKeys(machine.Name)
-	if err != nil {
-		return err
-	}
-	var extra []string
-	for _, k := range accessKeys {
-		extra = append(extra, k.PublicKey)
-	}
-	return h.Gen.WriteCombinedKeys(machine.Name, machine.PublicKey, extra)
 }
 
 func (h *Handlers) regenerateConfig() error {
@@ -414,17 +395,28 @@ func (h *Handlers) regenerateConfig() error {
 	if err != nil {
 		return err
 	}
-	if err := h.Gen.Generate(machines); err != nil {
+
+	// Build pipe entries with access keys for each machine
+	var entries []config.PipeEntry
+	for _, m := range machines {
+		accessKeys, err := h.DB.ListAccessKeys(m.Name)
+		if err != nil {
+			log.Printf("warning: failed to list access keys for %s: %v", m.Name, err)
+		}
+		// Write access key files
+		for _, ak := range accessKeys {
+			if err := h.Gen.WriteAccessKey(m.Name, ak.ID, ak.PublicKey); err != nil {
+				log.Printf("warning: failed to write access key %d: %v", ak.ID, err)
+			}
+		}
+		entries = append(entries, config.PipeEntry{Machine: m, AccessKeys: accessKeys})
+	}
+
+	if err := h.Gen.Generate(entries); err != nil {
 		return err
 	}
 	if err := h.Gen.UpdateAuthorizedKeys(machines); err != nil {
 		log.Printf("warning: failed to update authorized_keys: %v", err)
-	}
-	// Rewrite each machine's .pub to include access keys
-	for i := range machines {
-		if err := h.rewriteMachineKeys(&machines[i]); err != nil {
-			log.Printf("warning: failed to rewrite keys for %s: %v", machines[i].Name, err)
-		}
 	}
 	if h.OnChange != nil {
 		h.OnChange()

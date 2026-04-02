@@ -11,21 +11,29 @@ import (
 
 const sshpiperTemplate = `version: "1.0"
 pipes:
-{{- range .Machines }}
+{{- range .Entries }}
   - from:
-      - username: "{{ .Name }}"
+      - username: "{{ .Machine.Name }}"
         authorized_keys:
-          - {{ $.KeysDir }}/{{ .Name }}.pub
+          - {{ $.KeysDir }}/{{ .Machine.Name }}.pub
+{{- range .AccessKeys }}
+          - {{ $.KeysDir }}/{{ .Machine.Name }}_ak_{{ .ID }}.pub
+{{- end }}
     to:
-      host: localhost:{{ .Port }}
-      username: "{{ .LocalUser }}"
+      host: localhost:{{ .Machine.Port }}
+      username: "{{ .Machine.LocalUser }}"
       private_key: {{ $.ServerKey }}
       ignore_hostkey: true
 {{- end }}
 `
 
+type PipeEntry struct {
+	Machine    db.Machine
+	AccessKeys []db.AccessKey
+}
+
 type templateData struct {
-	Machines  []db.Machine
+	Entries   []PipeEntry
 	KeysDir   string
 	ServerKey string
 }
@@ -50,17 +58,26 @@ func (g *Generator) WriteKey(name, publicKey string) error {
 	return os.WriteFile(path, []byte(publicKey+"\n"), 0644)
 }
 
-// WriteCombinedKeys writes the machine's registration key plus any additional
-// access keys to the machine's .pub file. sshpiper reads this file in
-// authorized_keys format, so any of these keys can connect to the machine.
-func (g *Generator) WriteCombinedKeys(name, registrationKey string, accessKeys []string) error {
-	var keys string
-	keys += registrationKey + "\n"
-	for _, k := range accessKeys {
-		keys += k + "\n"
+// WriteAccessKey writes an individual access key to its own file.
+func (g *Generator) WriteAccessKey(machineName string, keyID int64, publicKey string) error {
+	path := filepath.Join(g.KeysDir, fmt.Sprintf("%s_ak_%d.pub", machineName, keyID))
+	return os.WriteFile(path, []byte(publicKey+"\n"), 0644)
+}
+
+// RemoveAccessKey removes an access key file.
+func (g *Generator) RemoveAccessKey(machineName string, keyID int64) error {
+	path := filepath.Join(g.KeysDir, fmt.Sprintf("%s_ak_%d.pub", machineName, keyID))
+	return os.Remove(path)
+}
+
+// CleanAccessKeys removes all access key files for a machine.
+func (g *Generator) CleanAccessKeys(machineName string) error {
+	pattern := filepath.Join(g.KeysDir, machineName+"_ak_*.pub")
+	files, _ := filepath.Glob(pattern)
+	for _, f := range files {
+		os.Remove(f)
 	}
-	path := filepath.Join(g.KeysDir, name+".pub")
-	return os.WriteFile(path, []byte(keys), 0644)
+	return nil
 }
 
 // RenameKey renames a machine's public key file.
@@ -103,8 +120,8 @@ func (g *Generator) UpdateAuthorizedKeys(machines []db.Machine) error {
 	return os.WriteFile(authKeysPath, keys, 0600)
 }
 
-// Generate writes the sshpiper.yaml config from the current machine list.
-func (g *Generator) Generate(machines []db.Machine) error {
+// Generate writes the sshpiper.yaml config from the current machine list and their access keys.
+func (g *Generator) Generate(entries []PipeEntry) error {
 	tmpl, err := template.New("sshpiper").Parse(sshpiperTemplate)
 	if err != nil {
 		return fmt.Errorf("parse template: %w", err)
@@ -117,7 +134,7 @@ func (g *Generator) Generate(machines []db.Machine) error {
 	defer f.Close()
 
 	data := templateData{
-		Machines:  machines,
+		Entries:   entries,
 		KeysDir:   g.KeysDir,
 		ServerKey: g.ServerKey,
 	}

@@ -50,13 +50,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to list machines: %v", err)
 	}
-	// Write all existing keys
+	// Write all existing keys and build pipe entries
+	var entries []config.PipeEntry
 	for _, m := range machines {
 		if err := gen.WriteKey(m.Name, m.PublicKey); err != nil {
 			log.Printf("Warning: failed to write key for %s: %v", m.Name, err)
 		}
+		accessKeys, err := database.ListAccessKeys(m.Name)
+		if err != nil {
+			log.Printf("Warning: failed to list access keys for %s: %v", m.Name, err)
+		}
+		for _, ak := range accessKeys {
+			if err := gen.WriteAccessKey(m.Name, ak.ID, ak.PublicKey); err != nil {
+				log.Printf("Warning: failed to write access key %d: %v", ak.ID, err)
+			}
+		}
+		entries = append(entries, config.PipeEntry{Machine: m, AccessKeys: accessKeys})
 	}
-	if err := gen.Generate(machines); err != nil {
+	if err := gen.Generate(entries); err != nil {
 		log.Fatalf("Failed to generate initial config: %v", err)
 	}
 	if err := gen.UpdateAuthorizedKeys(machines); err != nil {

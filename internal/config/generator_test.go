@@ -39,12 +39,12 @@ func TestGenerateWithMachines(t *testing.T) {
 	configPath := filepath.Join(dir, "sshpiper.yaml")
 	gen := NewGenerator(configPath, keysDir, "/data/server-key")
 
-	machines := []db.Machine{
-		{Name: "alice-mac", Port: 10022, LocalUser: "alice", PublicKey: "ssh-ed25519 AAAA alice"},
-		{Name: "bob-pc", Port: 10023, LocalUser: "bob", PublicKey: "ssh-ed25519 BBBB bob"},
+	entries := []PipeEntry{
+		{Machine: db.Machine{Name: "alice-mac", Port: 10022, LocalUser: "alice", PublicKey: "ssh-ed25519 AAAA alice"}},
+		{Machine: db.Machine{Name: "bob-pc", Port: 10023, LocalUser: "bob", PublicKey: "ssh-ed25519 BBBB bob"}},
 	}
 
-	if err := gen.Generate(machines); err != nil {
+	if err := gen.Generate(entries); err != nil {
 		t.Fatalf("generate: %v", err)
 	}
 
