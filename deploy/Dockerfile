@@ -32,8 +32,8 @@ RUN ssh-keygen -t ed25519 -f /etc/sshpiper/ssh_host_ed25519_key -N ""
 RUN adduser -D -s /sbin/nologin bastion && passwd -u bastion
 
 # Configure sshd for reverse tunnels (port 2222)
-RUN ssh-keygen -A && \
-    sed -i 's/#Port 22/Port 2222/' /etc/ssh/sshd_config && \
+# Host keys are generated in entrypoint.sh and persisted on the data volume
+RUN sed -i 's/#Port 22/Port 2222/' /etc/ssh/sshd_config && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i 's/AllowTcpForwarding no/AllowTcpForwarding yes/' /etc/ssh/sshd_config && \
     sed -i 's/GatewayPorts no/GatewayPorts no/' /etc/ssh/sshd_config && \

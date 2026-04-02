@@ -1,12 +1,21 @@
 #!/bin/sh
 set -e
 
-mkdir -p /data/keys /data/db
+mkdir -p /data/keys /data/db /data/host-keys
 
 # Generate server keypair on first boot (for upstream SSH auth)
 if [ ! -f /data/server-key ]; then
     echo "Generating server SSH keypair..."
     ssh-keygen -t ed25519 -f /data/server-key -N "" -C "bastion-server"
+fi
+
+# Persist sshd host keys on data volume so deploys don't break tunnels
+if [ ! -f /data/host-keys/ssh_host_ed25519_key ]; then
+    echo "Generating persistent sshd host keys..."
+    ssh-keygen -A
+    cp /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub /data/host-keys/
+else
+    cp /data/host-keys/* /etc/ssh/
 fi
 
 # Setup bastion user authorized_keys from server public key
