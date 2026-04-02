@@ -50,6 +50,19 @@ func (g *Generator) WriteKey(name, publicKey string) error {
 	return os.WriteFile(path, []byte(publicKey+"\n"), 0644)
 }
 
+// WriteCombinedKeys writes the machine's registration key plus any additional
+// access keys to the machine's .pub file. sshpiper reads this file in
+// authorized_keys format, so any of these keys can connect to the machine.
+func (g *Generator) WriteCombinedKeys(name, registrationKey string, accessKeys []string) error {
+	var keys string
+	keys += registrationKey + "\n"
+	for _, k := range accessKeys {
+		keys += k + "\n"
+	}
+	path := filepath.Join(g.KeysDir, name+".pub")
+	return os.WriteFile(path, []byte(keys), 0644)
+}
+
 // RenameKey renames a machine's public key file.
 func (g *Generator) RenameKey(oldName, newName string) error {
 	oldPath := filepath.Join(g.KeysDir, oldName+".pub")

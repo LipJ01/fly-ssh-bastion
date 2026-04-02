@@ -14,14 +14,22 @@ const (
 )
 
 type Machine struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Owner     string    `json:"owner"`
-	Port      int       `json:"port"`
-	LocalUser string    `json:"local_user"`
-	PublicKey string    `json:"public_key"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int64      `json:"id"`
+	Name      string     `json:"name"`
+	Owner     string     `json:"owner"`
+	Port      int        `json:"port"`
+	LocalUser string     `json:"local_user"`
+	PublicKey string     `json:"public_key"`
+	CreatedAt time.Time  `json:"created_at"`
 	LastSeen  *time.Time `json:"last_seen,omitempty"`
+}
+
+type AccessKey struct {
+	ID          int64     `json:"id"`
+	MachineName string    `json:"machine_name"`
+	Label       string    `json:"label"`
+	PublicKey   string    `json:"public_key"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type DB struct {
@@ -152,4 +160,67 @@ func (db *DB) UpdateLastSeen(name string) error {
 		return fmt.Errorf("machine %q not found", name)
 	}
 	return nil
+}
+
+func (db *DB) AddAccessKey(machineName, label, publicKey string) (*AccessKey, error) {
+	result, err := db.conn.Exec(
+		"INSERT INTO access_keys (machine_name, label, public_key) VALUES (?, ?, ?)",
+		machineName, label, publicKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("add access key: %w", err)
+	}
+	id, _ := result.LastInsertId()
+	return &AccessKey{
+		ID:          id,
+		MachineName: machineName,
+		Label:       label,
+		PublicKey:    publicKey,
+	}, nil
+}
+
+func (db *DB) ListAccessKeys(machineName string) ([]AccessKey, error) {
+	rows, err := db.conn.Query(
+		"SELECT id, machine_name, label, public_key, created_at FROM access_keys WHERE machine_name = ? ORDER BY id",
+		machineName,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var keys []AccessKey
+	for rows.Next() {
+		var k AccessKey
+		if err := rows.Scan(&k.ID, &k.MachineName, &k.Label, &k.PublicKey, &k.CreatedAt); err != nil {
+			return nil, err
+		}
+		keys = append(keys, k)
+	}
+	return keys, nil
+}
+
+func (db *DB) DeleteAccessKey(id int64) error {
+	result, err := db.conn.Exec("DELETE FROM access_keys WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("access key not found")
+	}
+	return nil
+}
+
+func (db *DB) GetAccessKey(id int64) (*AccessKey, error) {
+	k := &AccessKey{}
+	err := db.conn.QueryRow(
+		"SELECT id, machine_name, label, public_key, created_at FROM access_keys WHERE id = ?", id,
+	).Scan(&k.ID, &k.MachineName, &k.Label, &k.PublicKey, &k.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return k, nil
 }

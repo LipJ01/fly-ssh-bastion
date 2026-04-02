@@ -270,6 +270,145 @@ func (h *Handlers) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"ok":true}`))
 }
 
+func (h *Handlers) AddAccessKey(w http.ResponseWriter, r *http.Request) {
+	machineName := chi.URLParam(r, "name")
+
+	machine, err := h.DB.GetMachine(machineName)
+	if err != nil {
+		log.Printf("error getting machine: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if machine == nil {
+		jsonError(w, "machine not found", http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Label     string `json:"label"`
+		PublicKey string `json:"public_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if req.Label == "" || req.PublicKey == "" {
+		jsonError(w, "label and public_key are required", http.StatusBadRequest)
+		return
+	}
+	if err := validatePublicKey(req.PublicKey); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.PublicKey = strings.TrimSpace(req.PublicKey)
+
+	key, err := h.DB.AddAccessKey(machineName, req.Label, req.PublicKey)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			jsonError(w, "key already added to this machine", http.StatusConflict)
+			return
+		}
+		log.Printf("error adding access key: %v", err)
+		jsonError(w, "failed to add access key", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.rewriteMachineKeys(machine); err != nil {
+		log.Printf("error rewriting machine keys: %v", err)
+	}
+
+	if h.OnChange != nil {
+		h.OnChange()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(key)
+}
+
+func (h *Handlers) ListAccessKeys(w http.ResponseWriter, r *http.Request) {
+	machineName := chi.URLParam(r, "name")
+
+	machine, err := h.DB.GetMachine(machineName)
+	if err != nil {
+		log.Printf("error getting machine: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if machine == nil {
+		jsonError(w, "machine not found", http.StatusNotFound)
+		return
+	}
+
+	keys, err := h.DB.ListAccessKeys(machineName)
+	if err != nil {
+		log.Printf("error listing access keys: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if keys == nil {
+		keys = []db.AccessKey{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(keys)
+}
+
+func (h *Handlers) DeleteAccessKey(w http.ResponseWriter, r *http.Request) {
+	machineName := chi.URLParam(r, "name")
+	keyIDStr := chi.URLParam(r, "keyID")
+	var keyID int64
+	if _, err := fmt.Sscanf(keyIDStr, "%d", &keyID); err != nil {
+		jsonError(w, "invalid key id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the key belongs to this machine
+	key, err := h.DB.GetAccessKey(keyID)
+	if err != nil {
+		log.Printf("error getting access key: %v", err)
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if key == nil || key.MachineName != machineName {
+		jsonError(w, "access key not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.DB.DeleteAccessKey(keyID); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	machine, _ := h.DB.GetMachine(machineName)
+	if machine != nil {
+		if err := h.rewriteMachineKeys(machine); err != nil {
+			log.Printf("error rewriting machine keys: %v", err)
+		}
+	}
+
+	if h.OnChange != nil {
+		h.OnChange()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// rewriteMachineKeys rewrites a machine's .pub file with its registration key
+// plus all access keys, so sshpiper accepts any of them.
+func (h *Handlers) rewriteMachineKeys(machine *db.Machine) error {
+	accessKeys, err := h.DB.ListAccessKeys(machine.Name)
+	if err != nil {
+		return err
+	}
+	var extra []string
+	for _, k := range accessKeys {
+		extra = append(extra, k.PublicKey)
+	}
+	return h.Gen.WriteCombinedKeys(machine.Name, machine.PublicKey, extra)
+}
+
 func (h *Handlers) regenerateConfig() error {
 	machines, err := h.DB.ListMachines()
 	if err != nil {
@@ -280,6 +419,12 @@ func (h *Handlers) regenerateConfig() error {
 	}
 	if err := h.Gen.UpdateAuthorizedKeys(machines); err != nil {
 		log.Printf("warning: failed to update authorized_keys: %v", err)
+	}
+	// Rewrite each machine's .pub to include access keys
+	for i := range machines {
+		if err := h.rewriteMachineKeys(&machines[i]); err != nil {
+			log.Printf("warning: failed to rewrite keys for %s: %v", machines[i].Name, err)
+		}
 	}
 	if h.OnChange != nil {
 		h.OnChange()
